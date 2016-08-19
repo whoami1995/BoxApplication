@@ -13,268 +13,195 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.DosFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.stream.Stream;
 
 public class BoxApplication {
 
 	private static ArrayList<Box<?>> boxList = new ArrayList<>();
 	private static ArrayList<Box<?>> yellowBox = new ArrayList<>();
-	private static ArrayList<Box<?>> brownBox = new ArrayList<>(); 
-	private static BufferedReader reader = null;
-	private static BufferedWriter writer = null;
-	
+	private static ArrayList<Box<?>> brownBox = new ArrayList<>();
+
 	public static void main(String[] args) throws IOException, InterruptedException {
-			
+
 		BoxApplication box = new BoxApplication();
-	
-		Thread readThread = new Thread(new  Runnable() {
+
+		Thread readThread = new Thread(new Runnable() {
 			public void run() {
-				try {
-					BoxApplication.boxList = box.readFunction(reader, "Boxes.txt", getAmountOfLines("Boxes.txt"));
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+				BoxApplication.boxList = box.readFunction("Boxes.txt");
 			}
 		});
-		
+
 		Thread splitBoxThread = new Thread(new Runnable() {
 			public void run() {
-				box.splitBoxes(BoxApplication.boxList,BoxApplication.yellowBox,BoxApplication.brownBox);
+				box.splitBoxes(BoxApplication.boxList, BoxApplication.yellowBox, BoxApplication.brownBox);
 			}
 		});
-		
-		Thread sortBoxThread = new Thread(new Runnable() {
-			public void run() {
-				box.SortCollection(BoxApplication.yellowBox);
-				box.SortCollection(BoxApplication.brownBox);
-				box.SortCollection(BoxApplication.boxList);
-			}
-		});
-		
+
+		Thread sortYellow = new Thread(() -> Collections.sort(yellowBox));
+		Thread sortBrown = new Thread(() -> Collections.sort(brownBox));
+		Thread sortAll = new Thread(() -> Collections.sort(boxList));
+
 		Thread writeBoxesToFileThread = new Thread(new Runnable() {
 			public void run() {
-				try {
-					box.writeBoxesToFile(writer, BoxApplication.yellowBox, "BoxYellow.txt");
-					box.writeBoxesToFile(writer, BoxApplication.brownBox, "BoxBrown.txt");	
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+				box.writeBoxesToFile(BoxApplication.yellowBox, "BoxYellow.txt");
+				box.writeBoxesToFile(BoxApplication.brownBox, "BoxBrown.txt");
 			}
 		});
 
 		Thread writeWeightThread = new Thread(new Runnable() {
 			public void run() {
-				try {
-					box.writeHeavy(writer, BoxApplication.boxList, "Heavy.txt", 50);
-					box.writeLight(writer, BoxApplication.boxList, "Light.txt", 50);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+				box.writeMethode(BoxApplication.boxList, "Heavy.txt", 50, "Heavy");
+				box.writeMethode(BoxApplication.boxList, "Light.txt", 50, "Light");
 			}
 		});
-		
+
 		Thread writeFilePropertiesThread = new Thread(new Runnable() {
 			public void run() {
-				try {
-					box.printFileSpecs(writer, "Heavy.txt", "FileProperties.txt");
-				} catch (InvalidPathException | IOException e) {
-					e.printStackTrace();
-				}
+				box.printFileSpecs("Heavy.txt", "FileProperties.txt");
 			}
 		});
-		
+
 		readThread.start();
 		readThread.join();
 		splitBoxThread.start();
 		splitBoxThread.join();
-		sortBoxThread.start();
-		sortBoxThread.join();
+		sortYellow.start();
+		sortBrown.start();
+		sortAll.start();
+		sortYellow.join();
+		sortBrown.join();
+		
+		Thread flipBrown = new Thread(() -> Collections.reverse(brownBox));
+		Thread flipYellow = new Thread(() -> Collections.reverse(yellowBox));
+		Thread flipAll = new Thread(() -> Collections.reverse(boxList));
+		flipYellow.start();
+		flipBrown.start();
+		flipAll.start();
+		flipYellow.join();
+		flipBrown.join();
+		flipAll.join();
 		writeBoxesToFileThread.start();
+		sortAll.join();
 		writeWeightThread.start();
-		writeFilePropertiesThread.start();	
-		
-		writeBoxesToFileThread.join();
-		writeWeightThread.join();
 		writeFilePropertiesThread.join();
-		
+
 		box.printYellowBoxesTenHeigthWidth(BoxApplication.yellowBox);
 		box.printDangerBoxes(BoxApplication.boxList);
 	}
-	
-	private void SortCollection(ArrayList<Box<? extends Package>> doos)
-	{
-		Collections.sort(doos);
-	}
-	
-private void writeHeavy(BufferedWriter writer, ArrayList<Box<? extends Package>> boxList, String file, int amountOfLines) throws IOException
-	{
-		try
-		{
-			writer = new BufferedWriter(new FileWriter(file));
-			for(int i = boxList.size()-amountOfLines;i<boxList.size();i++)
-			{
-				writer.write(boxList.get(i).toString());
-				writer.newLine();
-			}
-		}
-		catch(Exception ex)
-		{
-			ex.printStackTrace();
-			System.out.println(ex.getMessage());
-		}
-		finally
-		{
-			if(writer != null)
-			{
-				writer.close();
-			}
-		}
 		
-	}
-	
-	private void writeLight(BufferedWriter writer, ArrayList<Box<? extends Package>> boxList, String file, int amountOfLines) throws IOException
+	private void writeMethode(ArrayList<Box<? extends Package>> boxList, String file,int aantal, String functie)
 	{
-		try
+		try(BufferedWriter writer = new BufferedWriter(new FileWriter(file)))
 		{
-			writer = new BufferedWriter(new FileWriter(file));
-			for(int i = 0; i<amountOfLines;i++)
+			switch(functie)
 			{
-				writer.write(boxList.get(i).toString());
-				writer.newLine();
+			case "Heavy":
+				for(int i = boxList.size() - aantal; i<boxList.size();i++)
+				{
+					writer.write(boxList.get(i).toString());
+					writer.newLine();
+				}
+				break;
+			case "Light":
+				for (int i = 0; i < aantal; i++) {
+					writer.write(boxList.get(i).toString());
+					writer.newLine();
+				}	
 			}
-		}
-		catch(IOException ex)
-		{
-			ex.printStackTrace();
-			System.out.println(ex.getMessage());
-		}
-		catch(Exception ex)
-		{
-			ex.printStackTrace();
-			System.out.println(ex.getMessage());
-		}
-		finally
-		{
-			if(writer != null)
-			{
-				writer.close();
-			}
+			
+			
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
-	
-	private void writeBoxesToFile(BufferedWriter writer, ArrayList<Box<? extends Package>> boxList, String file) throws IOException
-	{
-		try
-		{
-			writer = new BufferedWriter(new FileWriter(file));
-			for(Box<? extends Package> d : boxList)
-			{
+
+
+	private void writeBoxesToFile(ArrayList<Box<? extends Package>> boxList, String file) {
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+			for (Box<? extends Package> d : boxList) {
 				writer.write(d.toString());
 				writer.newLine();
 			}
+		} 
+		catch(FileNotFoundException ex)
+		{
+			ex.printStackTrace();
+		}
+		catch (IOException ex) {
+			ex.printStackTrace();
+			System.out.println(ex.getMessage());
+		}
+	}
+
+	private void splitBoxes(ArrayList<Box<?>> boxesList, ArrayList<Box<?>> yellowBoxList,
+			ArrayList<Box<?>> brownBoxList) {
+		for (Box<?> d : boxesList) {
+			if (d.getColor() == Color.YELLOW) {
+				yellowBoxList.add(d);
+			} else {
+				brownBoxList.add(d);
+			}
+		}
+	}
+	
+	private <T extends Package> Box<T> makeBox(String[] array, Color color) {
+        return new Box<T>(Double.parseDouble(array[1]), Double.parseDouble(array[2]),
+                color, Double.parseDouble(array[4]), Boolean.parseBoolean(array[5]));
+    }
+	
+	 private Box<? extends Package> boxFunction(String line, Color color) {
+	        String[] array = line.split(";");
+	        switch (array[0]) {
+	        case "Wood":
+	            return this.<Wood>makeBox(array, color);
+	        case "Metal":
+	            return this.<Metal>makeBox(array, color);
+	        case "Plastic":
+	            return this.<Plastic>makeBox(array, color);
+	        case "Paper":
+	            return this.<Paper>makeBox(array, color);
+	        }
+	        throw new IllegalArgumentException("Invalid Packaging: " + array[0]);
+	    }
+
+
+	private ArrayList<Box<? extends Package>> readFunction(String bestand) {
+		ArrayList<Box<? extends Package>> boxesList = new ArrayList<>();
+		try (BufferedReader reader = new BufferedReader(new FileReader(bestand))) {
+			String[] boxArray = new String[6];
+			String line = reader.readLine();
+			while(line != null)
+			{
+				boxArray = line.split(";");
+				if (boxArray[3].equals("Yellow")) {
+					boxesList.add(boxFunction(line, Color.YELLOW));
+				} else {
+					boxesList.add(boxFunction(line, Color.BROWN));
+				}
+				line = reader.readLine();
+			}
+		}
+		catch(FileNotFoundException ex)
+		{
+			ex.printStackTrace();
+		}
+		catch (InvalidPathException ex) {
+			ex.printStackTrace();
+			System.out.println(ex.getMessage());
 		}
 		catch(IOException ex)
 		{
 			ex.printStackTrace();
+		}
+		catch (Exception ex) {
 			System.out.println(ex.getMessage());
-		}
-		finally
-		{
-			if(writer != null)
-			{
-				writer.close();
-			}
-		}
-	}
-	
-	private void splitBoxes(ArrayList<Box<?>> boxesList, ArrayList<Box<?>> yellowBoxList, ArrayList<Box<?>> brownBoxList)
-	{
-		for(Box<?> d : boxesList)
-		{
-			if(d.getColor() == Color.YELLOW)
-			{
-				yellowBoxList.add(d);
-			}
-			else
-			{
-				brownBoxList.add(d);
-			}
-		}		
-	}
-
-	private static long getAmountOfLines(String file) throws IOException {
-		Stream<String> lines = null;
-		try {
-			Path p = Paths.get(file);
-			lines = Files.lines(p);
-		} catch (Exception ex) {
-			System.out.println(ex.getMessage());
-		}
-		return lines.count();
-	}
-
-	private void addObj(ArrayList<Box<?>> boxList, Box<?> box) {
-		boxList.add(box);
-	}
-
-	private Box<? extends Package> boxFunction(String line, Color color) {
-		String[] array = new String[6];
-		array = line.split(";");
-		Box<?> d = null;
-		switch (array[0]) {
-		case "Wood":
-			d = new Box<Wood>(Double.parseDouble(array[1]), Double.parseDouble(array[2]), color,
-					Double.parseDouble(array[4]), Boolean.parseBoolean(array[5]));
-			break;
-		case "Metal":
-			d = new Box<Metal>(Double.parseDouble(array[1]), Double.parseDouble(array[2]), color,
-					Double.parseDouble(array[4]), Boolean.parseBoolean(array[5]));
-			break;
-		case "Paper":
-			d = new Box<Paper>(Double.parseDouble(array[1]), Double.parseDouble(array[2]), color,
-					Double.parseDouble(array[4]), Boolean.parseBoolean(array[5]));
-			break;
-		case "Plastic":
-			d = new Box<Plastic>(Double.parseDouble(array[1]), Double.parseDouble(array[2]), color,
-					Double.parseDouble(array[4]), Boolean.parseBoolean(array[5]));
-			break;
-		}
-		return d;
-	}
-
-	private ArrayList<Box<? extends Package>> readFunction(BufferedReader reader, String bestand,long amountOfLines) throws IOException {
-		ArrayList<Box<? extends Package>> boxesList = new ArrayList<>();
-		try {
-			String[] boxArray = new String[6];
-			reader = new BufferedReader(new FileReader(bestand));
-			String line ="";
-			for (int i = 0; i < amountOfLines; i++) {
-				line = reader.readLine();
-				boxArray = line.split(";");
-				if (boxArray[3].equals("Yellow")) {
-					addObj(boxesList, boxFunction(line, Color.YELLOW));
-				} else {
-					addObj(boxesList, boxFunction(line, Color.BROWN));
-				}
-			}
-		} catch (Exception ex) {
-			System.out.println(ex.getMessage());
-		} finally {
-			if (reader != null) {
-				reader.close();
-			}
 		}
 		return boxesList;
 	}
-	
-	private void printFileSpecs(BufferedWriter writer, String fileNameToGetPath, String fileNameToWrite) throws IOException, InvalidPathException, FileNotFoundException
-	{
-		try
-		{
+
+	private void printFileSpecs(String fileNameToGetPath, String fileNameToWrite) {
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileNameToWrite))) {
 			Path p1 = Paths.get(fileNameToGetPath);
-			writer = new BufferedWriter(new FileWriter(fileNameToWrite));
-			DosFileAttributes attr = Files.readAttributes(p1,DosFileAttributes.class);
+			DosFileAttributes attr = Files.readAttributes(p1, DosFileAttributes.class);
 			writer.write("Hidden: " + attr.isHidden());
 			writer.newLine();
 			writer.write("Size: " + attr.size());
@@ -282,45 +209,27 @@ private void writeHeavy(BufferedWriter writer, ArrayList<Box<? extends Package>>
 			writer.write("Create date: " + attr.creationTime());
 			writer.newLine();
 			writer.write("Readonly: " + attr.isReadOnly());
-		}
-		catch(FileNotFoundException ex)
-		{
+		} catch (FileNotFoundException ex) {
+			ex.printStackTrace();
+			System.out.println(ex.getMessage());
+		} catch (InvalidPathException ex) {
+			ex.printStackTrace();
+			System.out.println(ex.getMessage());
+		} catch (IOException ex) {
+			ex.printStackTrace();
+			System.out.println(ex.getMessage());
+		} catch (Exception ex) {
 			ex.printStackTrace();
 			System.out.println(ex.getMessage());
 		}
-		catch(InvalidPathException ex)
-		{
-			ex.printStackTrace();
-			System.out.println(ex.getMessage());
-		}
-		catch(IOException ex)
-		{
-			ex.printStackTrace();
-			System.out.println(ex.getMessage());
-		}
-		catch(Exception ex)
-		{
-			ex.printStackTrace();
-			System.out.println(ex.getMessage());
-		}
-		finally
-		{
-			if(writer != null)
-			{
-				writer.close();
-			}
-		}
-		
-		
 	}
 
-	private void printYellowBoxesTenHeigthWidth(ArrayList<Box<? extends Package>> yboxList)
-	{
-		yboxList.stream().filter(s->s.getWidth()==10.0).filter(s->s.getHeight()==10.0).forEach(System.out::println);
+	private void printYellowBoxesTenHeigthWidth(ArrayList<Box<? extends Package>> yboxList) {
+		yboxList.stream().filter(s -> s.getWidth() == 10.0).filter(s -> s.getHeight() == 10.0)
+				.forEach(System.out::println);
 	}
-	
-	private void printDangerBoxes(ArrayList<Box<? extends Package>> dangerBoxes)
-	{
-		dangerBoxes.stream().filter(s->s.isDanger()==true).forEach(System.out::println);
+
+	private void printDangerBoxes(ArrayList<Box<? extends Package>> dangerBoxes) {
+		dangerBoxes.stream().filter(s -> s.isDanger() == true).forEach(System.out::println);
 	}
 }

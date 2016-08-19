@@ -1,0 +1,133 @@
+Uitbreiding/suggestie:
+Je hebt één thread die achtereenvolgens drie sorteringen doet:
+ 
+box.SortCollection(BoxApplication.yellowBox);
+box.SortCollection(BoxApplication.brownBox);
+box.SortCollection(BoxApplication.boxList);
+
+Omdat dit verschillende collections zijn, zou je kunnen verkiezen om de drie sorteringen tesamen te doen:
+Thread sortYellow = new Thread(() -> Collections.sort(yellowBox));
+Thread sortBrown = new Thread(() -> Collections.sort(brownBox));
+Thread sortAll = new Thread(() -> Collections.sort(boxList));
+ 
+sortYellow.start();
+sortBrown.start();
+sortAll.start();
+sortYellow.join();
+sortBrown.join();
+// nu kunnen de yellow en brown al worden weggeschreven.
+writeBoxesToFileThread.start();
+sortAll.join();
+writeWeightThread.start();
+ 
+
+Dit is nog niet helemaal correct, want de sortAll-thread is misschien eerder klaar, zodat writeWeightThread al kan beginnen. Of de writeBoxesToFileThread kan opgesplitst worden. Om dit te coördineren is meer infrastructuur nodig, zoals bijv. een ExecutorService, of een andere opdeling in de threads.
+
+Daarnaast, suggestie:
+ 
+Het moet doenbaar zijn om het grootste deel van de drie write-functies te combineren. Misschien is het voldoende om een int start, int eind mee te geven.
+ 
+
+---------------------------------
+
+Bemerking.
+De amountOfLines-methode en waarde bij "Boxes.txt" is niet nodig. I.p.v. te herhalen tot i amountOfLines is in readFunction(), kan je herhalen tot de lijn die je krijgt van readLine null is. Dat geeft:
+String line = reader.readLine();
+while (line != null) {
+  ...
+  line = reader.readLine();
+}
+
+--------------------------------------------
+
+Suggestie.
+Je kan je boxFunction vereenvoudigen::
+
+ 
+    private <T extends Package> Box<T> makeBox(String[] array, Color color) {
+        return new Box<T>(Double.parseDouble(array[1]), Double.parseDouble(array[2]),
+                color, Double.parseDouble(array[4]), Boolean.parseBoolean(array[5]));
+    }
+    
+    private Box<? extends Package> boxFunction(String line, Color color) {
+        String[] array = line.split(";");
+        switch (array[0]) {
+        case "Wood":
+            return this.<Wood>makeBox(array, color);
+        case "Metal":
+            return this.<Metal>makeBox(array, color);
+        case "Plastic":
+            return this.<Plastic>makeBox(array, color);
+        case "Paper":
+            return this.<Paper>makeBox(array, color);
+        }
+        return null;
+    }
+
+Eventueel kan je een exception gooien i.p.v. null teruggeven, bijv. throw new IllegalArgumentException("Invalid packaging: " + array[0]);
+
+Terzijde, door erasure wordt Wood, Metal, Plastic en Paper vervangen door Package, ook in jouw boxFunction. 'At runtime' is er dus geen verschil tussen de dozen. De boxFunction-methode geeft een Box<? extends Package> terug, dus ook 'at compiletime' kan niemand weten wat voor doos het is. Een methode die altijd een new Box<Package>(...) of null teruggeeft, is dus niet te onderscheiden van de methode nu. Ik begrijp wel waarom je ze zo hebt gemaakt.
+
+-------------------------------------------
+
+Een kleinigheid: waarom addObj? Hoe is addObj(boxesList, box) beter dan boxesList.add(box)?
+
+------------------------------------------------------------------
+
+Bemerking:
+Je readFunction zegt throws IOException, waardoor je  deze moet catchen in de Runnable. Bijna de volledige code van de functie, zit in een catch (Exception ex). Deze functie zal dus nooit een IOException geven.
+
+Mogelijke bug:
+Daarnaast: catch (Exception ex) wil je bijna nooit, omdat het te ruim is. Elke mogelijke fout, of het nu IOException of NullPointerException of iets anders is. Probeer catches altijd zo specifiek mogelijk te maken. 
+
+Bug:
+Verder doe je in de catch System.out.println(ex.getMessage()). Dit wilt zeggen dat het programma een bericht toont en dan gewoon verder loopt. Is dat wat je wilt als het bestand niet kon gelezen worden?
+
+--------------------------------------------------
+
+Geen bug, een wist-je-dat.
+
+ 
+} finally {
+        if (reader != null) {
+                reader.close();
+        }
+}
+
+Als je try-with-resources gebruikt, moet je zelf niets sluiten. Java doet dat voor jou. (cursus p. 105)
+
+try (BufferedReader reader = ...) {
+  ...
+  
+-----------------------------------
+
+
+Deze is niet echt een technische bug, eerder een vreemd ontwerp.
+
+ 
+private static BufferedReader reader = null;
+...
+box.readFunction(reader, ...)
+...
+... readFunction(BufferedReader reader, ...)
+
+Waarom? Je geeft niets zinvol door (null). De reader wordt enkel gebruikt binnen de methode. Je initialiseert het argument, niet de statische variabele, 
+dus BoxApplication.reader blijft null. Moest buitenaf wel aan de reader kunnen, kan ze niet gebruikt worden want ze is gesloten.
+
+-------------------------------------------------------
+
+int compare = (int) o.getWeight(); 
+return (int) (this.getWeight()-compare);
+
+Als deze doos 4.5 weegt en de andere 5.5, geef dit:
+compare = (int) 5.5 = 5
+return (int) (4.5 - 5) = (int) (-0.5) = 0
+Deze dozen hebben dus schijnbaar hetzelfde gewicht. Vreemd.
+
+Als deze doos 5.5 weeg en de andere 4.5, geef dit:
+compare = (int) 4.5 = 4
+return (int) (5.5 - 4) = (int) (1.5) = 1
+Nu weegt deze doos meer dan de andere. 
+
+Ik heb niet gecontroleerd of deze bug zich ook voordoet.
+
